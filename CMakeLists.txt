@@ -50,6 +50,10 @@ add_executable(qnd_ref src/qnd_ref.cu)
 target_link_libraries(qnd_ref PRIVATE qnd CUDA::cublas)
 target_compile_options(qnd_ref PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
 
+add_executable(qnd_gate1 src/qnd_gate1.cu)
+target_link_libraries(qnd_gate1 PRIVATE qnd CUDA::cublas)
+target_compile_options(qnd_gate1 PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
+
 # Gate 0 across the preset profiles at small-to-moderate chi; larger chi
 # runs are a manual driver invocation.
 foreach(case "tj-L64:32" "tj-L64:64" "tj-L64:256" "tj-L256:64"
