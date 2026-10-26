@@ -61,8 +61,20 @@ measured instead of modeled: the 1D profile is still head-dominated, but
 less extremely than the proxy claimed.
 
 Rung 2 — the bucketed-batched cuBLAS comparison path and the fused
-persistent kernel — has not started. Gate 0 must stay green before any
-timing number exists.
+persistent kernel — was not built. Gate 1 (DESIGN.md §6, the
+pre-committed kill rule) was measured 2026-10-26 with
+`src/qnd_gate1.cu` (exact schedule FLOP histogram plus head/tail wall
+split of the per-block cuBLAS loop, tail := max(m,k,n) < 64, median of
+20): the 1D single-band profiles die at production chi per the rule
+(t–J L=64 at chi >= 512, half-filled Hubbard at chi >= 256: top-8 FLOP
+share >= 0.96 with tail wall share <= 3%). The surviving profiles and a
+two-orbital control preset (`two-orb-L64`, 4 U(1) charges, ~2400
+sectors/2145 triples, top-8 = 0.79) show the same wall structure: the
+tail is launch-bound (~3–6 us per tiny GEMM, measured) and falls to
+<= 8% of matvec wall-clock by chi = 512 everywhere, so gate 2's 2x
+full-matvec bar is unreachable for a tail-scoped fused kernel. The
+project closes here with this table as the record (DESIGN.md §6); the
+generator, oracle, and baseline remain as the gated artifact.
 
 Sibling repos in the same kernel portfolio:
 [kpm-tightbinding](https://github.com/FireHorseAutumn/kpm-tightbinding),

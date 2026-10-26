@@ -51,8 +51,10 @@ int main() {
     // the DESIGN.md charge arithmetic n = d * m_{Q-q}.
     for (const auto& t : a.triples) {
       check(t.p_sector >= 0 && t.q_sector >= 0 && a.has_A[t.q_sector], "triple blocks exist");
-      const int comp = qnd::find_sector(a.sectors, p.total[0] - a.sectors[t.q_sector].q[0],
-                                        p.total[1] - a.sectors[t.q_sector].q[1]);
+      std::int32_t comp_q[qnd::kMaxCharges];
+      for (int c = 0; c < qnd::kMaxCharges; ++c)
+        comp_q[c] = p.total[c] - a.sectors[t.q_sector].q[c];
+      const int comp = qnd::find_sector(a.sectors, comp_q);
       check(comp >= 0 && t.n == p.phys_dim * a.sectors[comp].m, "n = d * m_{Q-q}");
       check(t.m == a.sectors[t.p_sector].m && t.k == a.sectors[t.q_sector].m,
             "m/k match sector dimensions");

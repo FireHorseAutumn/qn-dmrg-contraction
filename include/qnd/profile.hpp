@@ -12,30 +12,37 @@
 namespace qnd {
 
 constexpr double kWeightCutoff = 1e-6;
+constexpr int kMaxCharges = 4;
 
 struct Profile {
   const char* name;
-  double center[2];    // Gaussian center per charge, in sector labels
-  double sigma[2];     // width per charge
-  int label_max[2];    // sector labels run 0..label_max per charge
-  int total[2];        // total charge Q
+  int ncharges;          // 2 (single-band) or 4 (two-orbital)
+  double center[kMaxCharges];   // Gaussian center per charge, in sector labels
+  double sigma[kMaxCharges];    // width per charge
+  int label_max[kMaxCharges];   // sector labels run 0..label_max per charge
+  int total[kMaxCharges];       // total charge Q
   int phys_dim;        // d
 };
 
-// Presets follow the DESIGN.md §2 sector statistics.
+// Presets follow the DESIGN.md §2 sector statistics. Unused charges are
+// pinned: label_max = 0, center = 0 (weight exp(0) = 1 exactly).
+// two-orb-L64 is the DESIGN.md §2 two-orbital control: 4 U(1) charges,
+// sigma 0.55 each (~300 blocks at L = 64), Hubbard-like d = 16 (4^2
+// single-site states for two spin-1/2 orbitals).
 inline const Profile* profiles() {
   static const Profile p[] = {
-      {"tj-L64", {14.0, 14.0}, {0.55, 0.55}, {32, 32}, {28, 28}, 3},
-      {"tj-L256", {56.0, 56.0}, {0.67, 0.67}, {128, 128}, {112, 112}, 3},
-      {"hubbard-hf-L64", {16.0, 16.0}, {0.30, 0.55}, {32, 32}, {32, 32}, 4},
-      {"cylinder-w4", {14.0, 14.0}, {1.1, 1.1}, {40, 40}, {28, 28}, 3},
+      {"tj-L64", 2, {14.0, 14.0, 0.0, 0.0}, {0.55, 0.55, 1.0, 1.0}, {32, 32, 0, 0}, {28, 28, 0, 0}, 3},
+      {"tj-L256", 2, {56.0, 56.0, 0.0, 0.0}, {0.67, 0.67, 1.0, 1.0}, {128, 128, 0, 0}, {112, 112, 0, 0}, 3},
+      {"hubbard-hf-L64", 2, {16.0, 16.0, 0.0, 0.0}, {0.30, 0.55, 1.0, 1.0}, {32, 32, 0, 0}, {32, 32, 0, 0}, 4},
+      {"cylinder-w4", 2, {14.0, 14.0, 0.0, 0.0}, {1.1, 1.1, 1.0, 1.0}, {40, 40, 0, 0}, {28, 28, 0, 0}, 3},
+      {"two-orb-L64", 4, {14.0, 14.0, 14.0, 14.0}, {0.55, 0.55, 0.55, 0.55}, {32, 32, 32, 32}, {28, 28, 28, 28}, 16},
   };
   return p;
 }
-inline constexpr int kNumProfiles = 4;
+inline constexpr int kNumProfiles = 5;
 
 struct Sector {
-  std::int32_t q[2];
+  std::int32_t q[kMaxCharges];
   std::int64_t m;
   double weight;
 };
@@ -47,19 +54,29 @@ inline std::vector<Sector> generate_sectors(const Profile& prof, std::int64_t ch
     const double w0 = std::exp(-0.5 * d0 * d0);
     for (std::int32_t n1 = 0; n1 <= prof.label_max[1]; ++n1) {
       const double d1 = (n1 - prof.center[1]) / prof.sigma[1];
-      const double w = w0 * std::exp(-0.5 * d1 * d1);
-      if (w < kWeightCutoff) continue;
-      std::int64_t m = static_cast<std::int64_t>(std::llround(static_cast<double>(chi) * w));
-      if (m < 1) m = 1;
-      out.push_back({{n0, n1}, m, w});
+      const double w1 = w0 * std::exp(-0.5 * d1 * d1);
+      for (std::int32_t n2 = 0; n2 <= prof.label_max[2]; ++n2) {
+        const double d2 = (n2 - prof.center[2]) / prof.sigma[2];
+        const double w2 = w1 * std::exp(-0.5 * d2 * d2);
+        for (std::int32_t n3 = 0; n3 <= prof.label_max[3]; ++n3) {
+          const double d3 = (n3 - prof.center[3]) / prof.sigma[3];
+          const double w = w2 * std::exp(-0.5 * d3 * d3);
+          if (w < kWeightCutoff) continue;
+          std::int64_t m = static_cast<std::int64_t>(std::llround(static_cast<double>(chi) * w));
+          if (m < 1) m = 1;
+          out.push_back({{n0, n1, n2, n3}, m, w});
+        }
+      }
     }
   }
   return out;
 }
 
-inline int find_sector(const std::vector<Sector>& secs, std::int32_t q0, std::int32_t q1) {
+inline int find_sector(const std::vector<Sector>& secs, const std::int32_t* q) {
   for (std::size_t i = 0; i < secs.size(); ++i)
-    if (secs[i].q[0] == q0 && secs[i].q[1] == q1) return static_cast<int>(i);
+    if (secs[i].q[0] == q[0] && secs[i].q[1] == q[1] &&
+        secs[i].q[2] == q[2] && secs[i].q[3] == q[3])
+      return static_cast<int>(i);
   return -1;
 }
 
@@ -85,12 +102,19 @@ struct Schedule {
 inline std::int64_t align32(std::int64_t doubles) { return (doubles + 31) & ~std::int64_t(31); }
 inline std::int64_t pad_ld(std::int64_t rows) { return (rows + 3) & ~std::int64_t(3); }
 
-// MPO bond sectors for a nearest-neighbor two-charge model:
-// delta in {(0,0), (+-1,0), (0,+-1)} (DESIGN.md section 3, D_w ~ 5).
+// MPO bond sectors for a nearest-neighbor model: delta = 0 or +-1 on one
+// charge (DESIGN.md section 3; D_w = 1 + 2*ncharges: 5 for single-band,
+// 9 for two-orbital).
 inline Schedule build_schedule(const Profile& prof, std::int64_t chi) {
   Schedule s;
   s.sectors = generate_sectors(prof, chi);
-  static const std::int32_t deltas[5][2] = {{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+  const int nc = prof.ncharges;
+  std::int32_t deltas[1 + 2 * kMaxCharges][kMaxCharges] = {};
+  for (int c = 0; c < nc; ++c) {
+    deltas[1 + 2 * c][c] = 1;
+    deltas[2 + 2 * c][c] = -1;
+  }
+  const int ndelta = 1 + 2 * nc;
 
   // A blocks: one per sector whose charge complement Q - q is also present.
   s.offA.assign(s.sectors.size(), -1);
@@ -98,8 +122,9 @@ inline Schedule build_schedule(const Profile& prof, std::int64_t chi) {
   s.has_A.assign(s.sectors.size(), false);
   for (std::size_t i = 0; i < s.sectors.size(); ++i) {
     const auto& sec = s.sectors[i];
-    const int comp = find_sector(s.sectors, prof.total[0] - sec.q[0],
-                                 prof.total[1] - sec.q[1]);
+    std::int32_t comp_q[kMaxCharges];
+    for (int c = 0; c < kMaxCharges; ++c) comp_q[c] = prof.total[c] - sec.q[c];
+    const int comp = find_sector(s.sectors, comp_q);
     if (comp < 0) continue;
     s.has_A[i] = true;
     s.ldA[i] = pad_ld(sec.m);
@@ -108,13 +133,18 @@ inline Schedule build_schedule(const Profile& prof, std::int64_t chi) {
   }
 
   // Matched triples and L/C blocks.
-  for (const auto& delta : deltas) {
+  for (int di = 0; di < ndelta; ++di) {
+    const auto& delta = deltas[di];
     for (std::size_t iq = 0; iq < s.sectors.size(); ++iq) {
       const auto& qsec = s.sectors[iq];
-      const int ip = find_sector(s.sectors, qsec.q[0] + delta[0], qsec.q[1] + delta[1]);
+      std::int32_t pq[kMaxCharges], comp_q[kMaxCharges];
+      for (int c = 0; c < kMaxCharges; ++c) {
+        pq[c] = qsec.q[c] + delta[c];
+        comp_q[c] = prof.total[c] - qsec.q[c];
+      }
+      const int ip = find_sector(s.sectors, pq);
       if (ip < 0 || !s.has_A[iq]) continue;
-      const int comp = find_sector(s.sectors, prof.total[0] - qsec.q[0],
-                                   prof.total[1] - qsec.q[1]);
+      const int comp = find_sector(s.sectors, comp_q);
       Triple t;
       t.p_sector = ip;
       t.q_sector = static_cast<int>(iq);
@@ -140,8 +170,10 @@ inline Schedule build_schedule(const Profile& prof, std::int64_t chi) {
     acc += s.sectors[i].m;
     s.acol_off[i] = acol;
     if (s.has_A[i]) {
-      const int comp = find_sector(s.sectors, prof.total[0] - s.sectors[i].q[0],
-                                   prof.total[1] - s.sectors[i].q[1]);
+      std::int32_t comp_q[kMaxCharges];
+      for (int c = 0; c < kMaxCharges; ++c)
+        comp_q[c] = prof.total[c] - s.sectors[i].q[c];
+      const int comp = find_sector(s.sectors, comp_q);
       acol += prof.phys_dim * s.sectors[comp].m;
     }
   }

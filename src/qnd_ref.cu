@@ -69,8 +69,10 @@ int main(int argc, char** argv) {
   for (std::size_t iq = 0; iq < sched.sectors.size(); ++iq) {
     if (!sched.has_A[iq]) continue;
     const std::int64_t k = sched.sectors[iq].m;
-    const int comp = qnd::find_sector(sched.sectors, prof->total[0] - sched.sectors[iq].q[0],
-                                      prof->total[1] - sched.sectors[iq].q[1]);
+    std::int32_t comp_q[qnd::kMaxCharges];
+    for (int c = 0; c < qnd::kMaxCharges; ++c)
+      comp_q[c] = prof->total[c] - sched.sectors[iq].q[c];
+    const int comp = qnd::find_sector(sched.sectors, comp_q);
     const std::int64_t n = prof->phys_dim * sched.sectors[comp].m;
     for (std::int64_t j = 0; j < n; ++j)
       for (std::int64_t i = 0; i < k; ++i)
@@ -90,8 +92,10 @@ int main(int argc, char** argv) {
   for (std::size_t iq = 0; iq < sched.sectors.size(); ++iq) {
     if (!sched.has_A[iq]) continue;
     const std::int64_t k = sched.sectors[iq].m;
-    const int comp = qnd::find_sector(sched.sectors, prof->total[0] - sched.sectors[iq].q[0],
-                                      prof->total[1] - sched.sectors[iq].q[1]);
+    std::int32_t comp_q[qnd::kMaxCharges];
+    for (int c = 0; c < qnd::kMaxCharges; ++c)
+      comp_q[c] = prof->total[c] - sched.sectors[iq].q[c];
+    const int comp = qnd::find_sector(sched.sectors, comp_q);
     const std::int64_t n = prof->phys_dim * sched.sectors[comp].m;
     const std::int64_t r0 = sched.sec_off[iq], c0 = sched.acol_off[iq];
     for (std::int64_t j = 0; j < n; ++j)

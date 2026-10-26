@@ -57,7 +57,7 @@ target_compile_options(qnd_gate1 PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra
 # Gate 0 across the preset profiles at small-to-moderate chi; larger chi
 # runs are a manual driver invocation.
 foreach(case "tj-L64:32" "tj-L64:64" "tj-L64:256" "tj-L256:64"
-             "hubbard-hf-L64:64" "cylinder-w4:64")
+             "hubbard-hf-L64:64" "cylinder-w4:64" "two-orb-L64:32")
   string(REPLACE ":" ";" parts ${case})
   list(GET parts 0 prof)
   list(GET parts 1 chi)
