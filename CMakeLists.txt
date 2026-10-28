@@ -63,3 +63,11 @@ foreach(case "tj-L64:32" "tj-L64:64" "tj-L64:256" "tj-L256:64"
   list(GET parts 1 chi)
   add_test(NAME gate0_${prof}_${chi} COMMAND qnd_ref ${prof} ${chi})
 endforeach()
+
+# Entry-point rejection: chi < 1 and reps < 1 exit 2 (the empty-vector
+# deref / clamped-nonsense paths, both silent before the guards).
+add_test(NAME gate1_reject_chi0 COMMAND qnd_gate1 tj-L64 0)
+add_test(NAME gate1_reject_reps0 COMMAND qnd_gate1 tj-L64 128 0)
+add_test(NAME ref_reject_chi0 COMMAND qnd_ref tj-L64 0)
+set_tests_properties(gate1_reject_chi0 gate1_reject_reps0 ref_reject_chi0
+                     PROPERTIES WILL_FAIL TRUE)

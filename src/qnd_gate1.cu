@@ -94,6 +94,14 @@ int main(int argc, char** argv) {
   }
   const std::int64_t chi = std::atoll(argv[2]);
   const int reps = argc > 3 ? std::atoi(argv[3]) : 20;
+  if (chi < 1) {
+    std::fprintf(stderr, "qnd_gate1: chi must be >= 1\n");
+    return 2;
+  }
+  if (reps < 1) {
+    std::fprintf(stderr, "qnd_gate1: reps must be >= 1\n");
+    return 2;
+  }
 
   const qnd::Schedule sched = qnd::build_schedule(*prof, chi);
   if (sched.triples.empty()) {

@@ -50,6 +50,10 @@ int main(int argc, char** argv) {
     return 2;
   }
   const std::int64_t chi = std::atoll(argv[2]);
+  if (chi < 1) {
+    std::fprintf(stderr, "qnd_ref: chi must be >= 1\n");
+    return 2;
+  }
   const std::uint64_t seed = argc > 3 ? std::strtoull(argv[3], nullptr, 10) : 12345;
 
   const qnd::Schedule sched = qnd::build_schedule(*prof, chi);
